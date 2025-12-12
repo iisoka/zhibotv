@@ -1,0 +1,90 @@
+# 电视直播网站部署到Cloudflare Pages步骤指南
+
+## 准备工作
+1. 确保您已经有一个GitHub或GitLab账户
+2. 确保您已经有一个Cloudflare账户
+3. 桌面的TV-Website-Deploy文件夹中包含了所有需要部署的文件
+
+## 步骤1：创建Git仓库并上传文件
+
+### 方法A：使用GitHub Desktop（推荐新手）
+1. 下载并安装GitHub Desktop：https://desktop.github.com/
+2. 打开GitHub Desktop，登录您的GitHub账户
+3. 点击"新建仓库"，然后选择"添加现有仓库"
+4. 浏览并选择桌面的"TV-Website-Deploy"文件夹
+5. 点击"发布仓库"，将仓库推送到GitHub
+
+### 方法B：使用命令行
+1. 打开命令提示符（CMD）或PowerShell
+2. 执行以下命令：
+   ```
+   cd C:\Users\Administrator\Desktop\TV-Website-Deploy
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git remote add origin https://github.com/您的用户名/tv-website.git
+   git push -u origin main
+   ```
+
+## 步骤2：部署到Cloudflare Pages
+
+1. 登录Cloudflare账户：https://dash.cloudflare.com/
+2. 在左侧导航栏中选择"Pages"
+3. 点击"创建项目"按钮
+4. 在"连接到Git"页面：
+   - 选择您的Git提供商（GitHub或GitLab）
+   - 授权Cloudflare访问您的仓库
+   - 选择刚刚创建的仓库（tv-website或您自定义的名称）
+   - 点击"开始设置"
+5. 在"配置构建和部署"页面：
+   - 项目名称：可以保留默认名称或自定义
+   - 生产分支：main
+   - 框架预设：选择"None"
+   - 构建命令：留空（因为是静态网站，不需要构建）
+   - 发布目录：留空或使用"."
+   - 根目录：留空
+   - 环境变量：暂时不需要添加
+6. 点击"保存并部署"按钮开始部署过程
+
+## 步骤3：等待部署完成
+
+- Cloudflare Pages将自动开始构建和部署您的网站
+- 部署过程通常需要1-2分钟
+- 部署完成后，您将看到一个绿色的成功标志
+
+## 步骤4：访问您的网站
+
+1. 部署完成后，您可以在项目概览页面找到您的网站URL
+2. URL格式通常为：`您的项目名称.pages.dev`
+3. 点击URL即可访问您的电视直播网站
+
+## 步骤5：配置自定义域名（可选）
+
+如果您有自己的域名并希望使用它：
+
+1. 在Cloudflare Pages项目中，点击"自定义域"
+2. 点击"设置自定义域"
+3. 输入您的域名（例如：tv.yourdomain.com）
+4. 按照Cloudflare提供的说明在您的域名注册商处添加DNS记录
+5. 等待DNS传播（可能需要几分钟到几小时）
+
+## 网站功能说明
+
+您的电视直播网站包含以下功能：
+
+- 支持HLS和DASH协议的流媒体播放器
+- 频道列表和分类管理
+- 频道搜索、排序和收藏功能
+- 最近观看记录
+- 自动质量切换和网络状态检测
+- 响应式设计，适配各种设备
+- 键盘快捷键支持
+- 移动端触摸优化
+
+## 注意事项
+
+- 当前网站使用模拟数据，您需要替换scripts.js中的频道数据为真实的直播流URL
+- 确保您使用的直播流URL支持跨域访问（CORS）
+- 对于真实部署，建议配置HTTPS证书以确保安全连接
+
+祝您部署顺利！

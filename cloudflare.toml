@@ -1,0 +1,38 @@
+# Cloudflare Pages 配置文件
+
+# 构建输出目录 (对于静态网站，我们使用根目录)
+# 注意：由于我们没有构建过程，这里不设置构建命令
+
+# 忽略构建过程
+# publish 表示发布目录，这里是根目录
+publish = "."
+
+# 环境变量
+[env]
+  # 可以在这里设置环境变量，但目前我们不需要特殊的环境变量
+
+# 页面规则
+[build]  
+  # 由于我们的应用是纯静态的，不需要构建命令
+  command = ""
+  # 输出目录
+  publish = "."
+  # 忽略缓存
+  # 自定义路由规则 (已在_redirects文件中定义)
+
+# 预览环境配置
+[preview]
+  command = ""
+  publish = "."
+
+# 忽略文件 - 避免部署不必要的文件
+[ignore]
+  # 忽略常见的开发文件
+  exclude = [
+    "*.log",
+    ".git",
+    ".gitignore",
+    "node_modules",
+    ".DS_Store",
+    "Thumbs.db"
+  ]

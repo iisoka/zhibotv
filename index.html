@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电视直播 - 免费在线观看</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+    <header>
+        <div class="logo">电视直播</div>
+        <nav>
+            <ul>
+                <li><a href="#">首页</a></li>
+                <li><a href="#">分类</a></li>
+                <li><a href="#">收藏</a></li>
+                <li><a href="#">关于</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="player-section">
+            <div class="player-container">
+                <video id="live-player" class="video-player" controls autoplay></video>
+                <div id="channel-info">
+                    <h2 id="channel-title">请选择一个频道</h2>
+                    <p id="channel-description">点击下方频道列表开始观看</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="channels-section">
+            <div class="channels-header">
+                <h2>频道列表</h2>
+                <div class="channel-filters">
+                    <button class="filter-btn active" data-category="all">全部</button>
+                    <button class="filter-btn" data-category="news">新闻</button>
+                    <button class="filter-btn" data-category="entertainment">娱乐</button>
+                    <button class="filter-btn" data-category="sports">体育</button>
+                    <button class="filter-btn" data-category="education">教育</button>
+                </div>
+            </div>
+            <div class="channels-grid" id="channels-container">
+                <!-- 频道列表将通过JavaScript动态生成 -->
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 电视直播. 所有权利保留.</p>
+    </footer>
+
+    <script src="scripts.js"></script>
+</body>
+</html>
