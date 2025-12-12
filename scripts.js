@@ -454,17 +454,51 @@ const playbackStats = {
 // 加载dash.js库
 async function loadDashJs() {
     return new Promise((resolve, reject) => {
+        // 设置加载超时（10秒）
+        const timeoutId = setTimeout(() => {
+            reject(new Error('dash.js加载超时'));
+        }, 10000);
+        
         // 检查是否已经加载了dash.js
         if (window.dashjs) {
+            clearTimeout(timeoutId);
             resolve(window.dashjs);
             return;
         }
         
+        console.log('开始加载dash.js库...');
         const script = document.createElement('script');
         script.src = 'https://cdn.dashjs.org/latest/dash.all.min.js';
-        script.onload = () => resolve(window.dashjs);
-        script.onerror = reject;
-        document.head.appendChild(script);
+        script.onload = () => {
+            clearTimeout(timeoutId);
+            if (window.dashjs) {
+                console.log('dash.js库加载成功');
+                resolve(window.dashjs);
+            } else {
+                reject(new Error('dash.js加载失败：window.dashjs未定义'));
+            }
+        };
+        script.onerror = (error) => {
+            clearTimeout(timeoutId);
+            console.error('dash.js加载错误:', error);
+            reject(new Error(`dash.js加载失败: ${error.message || '未知错误'}`));
+        };
+        
+        // 确保只添加一次脚本
+        const existingScript = document.querySelector('script[src*="dashjs"]');
+        if (!existingScript) {
+            document.head.appendChild(script);
+        } else {
+            // 如果已经有脚本，等待它加载完成
+            if (window.dashjs) {
+                clearTimeout(timeoutId);
+                resolve(window.dashjs);
+            } else {
+                // 为已存在的脚本添加事件监听器
+                existingScript.onload = script.onload;
+                existingScript.onerror = script.onerror;
+            }
+        }
     });
 }
 
@@ -1496,63 +1530,130 @@ async function playJsonStream(url) {
 
 // 播放HLS流
 async function playHlsStream(url) {
+    showLoading();
+    console.log('开始播放HLS流:', url);
+    
     return new Promise((resolve, reject) => {
+        // 清理之前的dashPlayer实例（如果有）
+        if (dashPlayer) {
+            dashPlayer.destroy();
+            dashPlayer = null;
+        }
+        
+        // 清理之前的hls实例
+        if (hls) {
+            hls.destroy();
+            hls = null;
+        }
+        
         if (Hls.isSupported()) {
-            hls = new Hls({
-                maxBufferLength: 30, // 最大缓冲长度
-                maxMaxBufferLength: 60,
-                maxBufferHole: 0.5,
-                startLevel: -1, // 自动选择质量
-                capLevelToPlayerSize: true, // 根据播放器大小限制质量
-                enableWorker: true, // 启用Web Worker
-                lowLatencyMode: true // 低延迟模式
-            });
-            
-            hls.loadSource(url);
-            hls.attachMedia(player);
-            
-            // 监听质量级别变化
-            hls.on(Hls.Events.LEVELS_UPDATED, (event, data) => {
-                playbackStats.qualityLevels = data.levels.map((level, index) => ({
-                    index,
-                    height: level.height,
-                    bandwidth: level.bandwidth
-                }));
-            });
-            
-            // 当前质量变化
-            hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
-                playbackStats.currentQuality = playbackStats.qualityLevels[data.level];
-            });
-            
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                player.play().then(resolve).catch(reject);
-            });
-            
-            hls.on(Hls.Events.ERROR, (event, data) => {
-                console.error('HLS 错误:', data);
+            try {
+                hls = new Hls({
+                    maxBufferLength: 30, // 最大缓冲长度
+                    maxMaxBufferLength: 60,
+                    maxBufferHole: 0.5,
+                    startLevel: -1, // 自动选择质量
+                    capLevelToPlayerSize: true, // 根据播放器大小限制质量
+                    enableWorker: true, // 启用Web Worker
+                    lowLatencyMode: true // 低延迟模式
+                });
                 
-                if (data.fatal) {
-                    switch (data.type) {
-                        case Hls.ErrorTypes.NETWORK_ERROR:
-                            console.error('网络错误，尝试重新加载...');
-                            hls.loadSource(url);
-                            break;
-                        case Hls.ErrorTypes.MEDIA_ERROR:
-                            console.error('媒体错误');
-                            reject(new Error('媒体解码错误'));
-                            break;
-                        default:
-                            reject(new Error('HLS播放错误'));
+                hls.loadSource(url);
+                hls.attachMedia(player);
+                
+                // 监听质量级别变化
+                hls.on(Hls.Events.LEVELS_UPDATED, (event, data) => {
+                    playbackStats.qualityLevels = data.levels.map((level, index) => ({
+                        index,
+                        height: level.height,
+                        bandwidth: level.bandwidth
+                    }));
+                });
+                
+                // 当前质量变化
+                hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+                    playbackStats.currentQuality = playbackStats.qualityLevels[data.level];
+                });
+                
+                // 设置超时（20秒）
+                const timeoutId = setTimeout(() => {
+                    console.error('HLS流加载超时');
+                    reject(new Error('HLS流加载超时'));
+                }, 20000);
+                
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    clearTimeout(timeoutId);
+                    console.log('HLS清单解析成功');
+                    player.play().then(() => {
+                        hideLoading();
+                        resolve();
+                    }).catch((playError) => {
+                        hideLoading();
+                        console.error('HLS播放失败:', playError);
+                        reject(new Error('HLS播放失败'));
+                    });
+                });
+                
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    console.error('HLS 错误:', data);
+                    
+                    if (data.fatal) {
+                        switch (data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                console.error('网络错误，尝试重新加载...');
+                                // 只尝试重新加载一次
+                                if (!data.retryAttempted) {
+                                    data.retryAttempted = true;
+                                    hls.loadSource(url);
+                                } else {
+                                    clearTimeout(timeoutId);
+                                    hideLoading();
+                                    reject(new Error('网络错误，无法加载HLS流'));
+                                }
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                console.error('媒体错误，尝试作为直接流播放');
+                                clearTimeout(timeoutId);
+                                // 尝试作为直接流播放
+                                playDirectStreamFallback(url).then(resolve).catch(reject);
+                                break;
+                            default:
+                                clearTimeout(timeoutId);
+                                hideLoading();
+                                reject(new Error('HLS播放错误'));
+                        }
                     }
-                }
-            });
+                });
+                
+                // 监听视频元素错误
+                player.onerror = (e) => {
+                    clearTimeout(timeoutId);
+                    console.error('视频元素错误:', e);
+                    hideLoading();
+                    reject(new Error('视频元素播放错误'));
+                };
+                
+            } catch (initError) {
+                console.error('HLS初始化错误:', initError);
+                hideLoading();
+                reject(new Error('HLS播放器初始化失败'));
+            }
         } else if (player.canPlayType('application/vnd.apple.mpegurl')) {
             // Safari 原生支持 HLS
+            console.log('使用浏览器原生HLS支持');
             player.src = url;
-            player.play().then(resolve).catch(reject);
+            player.play().then(() => {
+                hideLoading();
+                resolve();
+            }).catch((playError) => {
+                hideLoading();
+                console.error('原生HLS播放失败:', playError);
+                reject(new Error('原生HLS播放失败'));
+            });
         } else {
-            reject(new Error('您的浏览器不支持 HLS 流媒体播放'));
+            console.error('浏览器不支持HLS，尝试作为直接流播放');
+            // 尝试作为直接流播放
+            playDirectStreamFallback(url).then(resolve).catch(reject);
         }
     });
 }
@@ -1560,52 +1661,174 @@ async function playHlsStream(url) {
 // 播放DASH流
 async function playDashStream(url) {
     try {
-        const dashjs = await loadDashJs();
-        dashPlayer = dashjs.MediaPlayer().create();
+        showLoading();
+        console.log('开始播放DASH流:', url);
         
-        // 配置DASH播放器
-        dashPlayer.updateSettings({
-            'streaming': {
-                'abr': {
-                    'autoSwitchBitrate': {
-                        'video': true
+        // 清理之前的HLS实例（如果有）
+        if (hls) {
+            hls.destroy();
+            hls = null;
+        }
+        
+        let dashjs;
+        try {
+            // 动态加载dash.js库
+            dashjs = await loadDashJs();
+        } catch (loadError) {
+            console.error('dash.js加载失败，尝试作为直接流播放:', loadError);
+            // dash.js加载失败时，尝试作为直接流播放
+            return playDirectStreamFallback(url);
+        }
+        
+        try {
+            dashPlayer = dashjs.MediaPlayer().create();
+            
+            // 配置DASH播放器
+            dashPlayer.updateSettings({
+                'streaming': {
+                    'abr': {
+                        'autoSwitchBitrate': {
+                            'video': true
+                        },
+                        'bandwidthSafetyFactor': 0.9
                     },
-                    'bandwidthSafetyFactor': 0.9
-                },
-                'buffer': {
-                    'stableBufferTime': 15,
-                    'bufferTimeAtTopQuality': 8
+                    'buffer': {
+                        'stableBufferTime': 15,
+                        'bufferTimeAtTopQuality': 8
+                    }
                 }
-            }
-        });
-        
-        dashPlayer.initialize(player, url, true);
-        
-        // 监听质量变化
-        dashPlayer.on(dashjs.MediaPlayer.events.QUALITY_CHANGE_RENDERED, (e) => {
-            if (e.mediaType === 'video') {
-                playbackStats.currentQuality = {
-                    index: e.newQuality,
-                    bitrate: dashPlayer.getBitrateInfoListFor('video')[e.newQuality].bitrate
+            });
+            
+            dashPlayer.initialize(player, url, true);
+            
+            // 监听质量变化
+            dashPlayer.on(dashjs.MediaPlayer.events.QUALITY_CHANGE_RENDERED, (e) => {
+                if (e.mediaType === 'video') {
+                    playbackStats.currentQuality = {
+                        index: e.newQuality,
+                        bitrate: dashPlayer.getBitrateInfoListFor('video')[e.newQuality].bitrate
+                    };
+                }
+            });
+            
+            // 监听错误事件
+            dashPlayer.on(dashjs.MediaPlayer.events.ERROR, (event) => {
+                console.error('DASH错误:', event);
+            });
+            
+            // 设置超时处理
+            let timeoutId;
+            
+            return new Promise((resolve, reject) => {
+                // 设置15秒超时
+                timeoutId = setTimeout(() => {
+                    reject(new Error('DASH视频加载超时'));
+                }, 15000);
+                
+                dashPlayer.on(dashjs.MediaPlayer.events.PLAYBACK_STARTED, () => {
+                    clearTimeout(timeoutId);
+                    hideLoading();
+                    resolve();
+                });
+                
+                // 监听视频元素错误
+                player.onerror = (e) => {
+                    clearTimeout(timeoutId);
+                    console.error('视频元素错误:', e);
+                    reject(new Error('视频元素播放错误'));
                 };
-            }
-        });
-        
-        return new Promise((resolve) => {
-            dashPlayer.on(dashjs.MediaPlayer.events.PLAYBACK_STARTED, resolve);
-        });
+            });
+        } catch (playbackError) {
+            console.error('DASH流播放失败，尝试备用方案:', playbackError);
+            // 播放失败时，尝试作为直接流播放
+            return playDirectStreamFallback(url);
+        }
     } catch (error) {
-        console.error('DASH播放错误:', error);
-        throw new Error('DASH流播放失败');
+        console.error('DASH流处理完全失败:', error);
+        hideLoading();
+        throw error;
+    }
+}
+
+// 作为直接流的回退播放函数
+async function playDirectStreamFallback(url) {
+    console.log('尝试作为直接流播放:', url);
+    try {
+        // 使用增强的playDirectStream函数
+        return await playDirectStream(url);
+    } catch (fallbackError) {
+        console.error('直接流播放也失败:', fallbackError);
+        hideLoading();
+        throw new Error(`所有播放方法都失败: ${fallbackError.message}`);
     }
 }
 
 // 直接播放其他格式
 async function playDirectStream(url) {
     return new Promise((resolve, reject) => {
-        player.src = url;
-        player.play().then(resolve).catch(reject);
+        // 尝试确定媒体类型
+        let mimeType = '';
+        if (url.includes('.mp4')) {
+            mimeType = 'video/mp4';
+        } else if (url.includes('.webm')) {
+            mimeType = 'video/webm';
+        } else if (url.includes('.mkv')) {
+            mimeType = 'video/x-matroska';
+        } else if (url.includes('.ogg')) {
+            mimeType = 'video/ogg';
+        }
+        
+        // 创建source元素以支持多个格式
+        const source = document.createElement('source');
+        source.src = url;
+        if (mimeType) {
+            source.type = mimeType;
+        }
+        
+        // 清空现有源
+        while (player.firstChild) {
+            player.removeChild(player.firstChild);
+        }
+        
+        player.appendChild(source);
+        
+        // 监听错误事件
+        const errorHandler = (e) => {
+            console.error('视频播放错误:', e);
+            const errorMessage = getVideoErrorMessage(e.target.error);
+            reject(new Error(errorMessage));
+            player.removeEventListener('error', errorHandler);
+        };
+        
+        player.addEventListener('error', errorHandler);
+        
+        player.load();
+        player.play().then(() => {
+            player.removeEventListener('error', errorHandler);
+            resolve();
+        }).catch((err) => {
+            player.removeEventListener('error', errorHandler);
+            reject(err);
+        });
     });
+}
+
+// 获取视频错误的详细消息
+function getVideoErrorMessage(error) {
+    if (!error) return '未知视频错误';
+    
+    switch(error.code) {
+        case MediaError.MEDIA_ERR_ABORTED:
+            return '视频加载被用户中止';
+        case MediaError.MEDIA_ERR_NETWORK:
+            return '网络错误导致视频加载失败';
+        case MediaError.MEDIA_ERR_DECODE:
+            return '视频解码错误，格式不支持或已损坏';
+        case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+            return '不支持的媒体格式或文件不存在';
+        default:
+            return `未知视频错误 (代码: ${error.code})`;
+    }
 }
 
 // 显示加载状态
