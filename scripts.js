@@ -4,6 +4,8 @@
 let favoriteChannels = [];
 let currentCategory = 'all';
 let searchQuery = '';
+let userCustomChannels = [];
+const USER_CUSTOM_CHANNELS_KEY = 'userCustomChannels';
 
 // 从本地存储加载收藏频道
 function loadFavoriteChannels() {
@@ -25,6 +27,213 @@ function saveFavoriteChannels() {
     } catch (error) {
         console.error('保存收藏失败:', error);
     }
+}
+
+// 加载用户自定义频道（从Cloudflare D1数据库）
+async function loadUserCustomChannels() {
+    try {
+        console.log('测试: 开始从数据库加载用户自定义频道');
+        const response = await fetch('/api/channels', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+                userCustomChannels = data.data.map(channel => ({
+                    ...channel,
+                    id: channel.id.toString(), // 确保ID是字符串格式
+                    isCustom: true
+                }));
+                console.log('测试: 从数据库加载成功，共', userCustomChannels.length, '个自定义频道');
+            }
+        } else {
+            console.error('测试: 从数据库加载失败，状态码:', response.status);
+            // 失败时使用localStorage作为后备
+            const saved = localStorage.getItem(USER_CUSTOM_CHANNELS_KEY);
+            if (saved) {
+                userCustomChannels = JSON.parse(saved);
+                console.log('测试: 从localStorage加载后备数据，共', userCustomChannels.length, '个频道');
+            }
+        }
+    } catch (error) {
+        console.error('测试: 加载用户自定义频道失败:', error);
+        userCustomChannels = [];
+    }
+}
+
+// 添加用户自定义频道（保存到Cloudflare D1数据库）
+async function addUserCustomChannel(channelData) {
+    try {
+        console.log('测试: 开始添加频道到数据库', channelData);
+        const response = await fetch('/api/channels', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(channelData)
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data) {
+                const newChannel = {
+                    ...data.data,
+                    id: data.data.id.toString(),
+                    isCustom: true
+                };
+                userCustomChannels.push(newChannel);
+                console.log('测试: 频道添加到数据库成功');
+                
+                // 保存到localStorage作为后备
+                saveUserCustomChannelsLocal();
+                
+                return newChannel;
+            }
+        }
+        
+        console.error('测试: 添加频道到数据库失败，状态码:', response.status);
+        
+        // 失败时回退到localStorage
+        const fallbackChannel = addUserCustomChannelLocal(channelData);
+        return fallbackChannel;
+    } catch (error) {
+        console.error('测试: 添加频道失败:', error);
+        
+        // 异常时回退到localStorage
+        const fallbackChannel = addUserCustomChannelLocal(channelData);
+        return fallbackChannel;
+    }
+}
+
+// 删除用户自定义频道（从Cloudflare D1数据库）
+async function deleteUserCustomChannel(channelId) {
+    try {
+        console.log('测试: 开始从数据库删除频道，ID:', channelId);
+        
+        // 如果是从数据库加载的频道，发送删除请求
+        const dbChannel = userCustomChannels.find(channel => channel.id === channelId && channel.isCustom);
+        if (dbChannel && !isNaN(Number(channelId))) {
+            const response = await fetch(`/api/channels/${channelId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    // 从本地数组中移除
+                    userCustomChannels = userCustomChannels.filter(channel => channel.id !== channelId);
+                    console.log('测试: 频道从数据库删除成功');
+                    
+                    // 更新localStorage后备
+                    saveUserCustomChannelsLocal();
+                    
+                    return true;
+                }
+            }
+            
+            console.error('测试: 从数据库删除失败，状态码:', response.status);
+        }
+        
+        // 失败时回退到localStorage
+        return deleteUserCustomChannelLocal(channelId);
+    } catch (error) {
+        console.error('测试: 删除频道失败:', error);
+        
+        // 异常时回退到localStorage
+        return deleteUserCustomChannelLocal(channelId);
+    }
+}
+
+// 本地存储相关的后备函数
+function saveUserCustomChannelsLocal() {
+    try {
+        localStorage.setItem(USER_CUSTOM_CHANNELS_KEY, JSON.stringify(userCustomChannels));
+        console.log('测试: 保存到localStorage作为后备成功');
+    } catch (error) {
+        console.error('测试: 保存到localStorage失败:', error);
+    }
+}
+
+function addUserCustomChannelLocal(channelData) {
+    const newChannel = {
+        id: Date.now().toString(), // 使用时间戳作为ID
+        name: channelData.name,
+        url: channelData.url,
+        description: channelData.description || '',
+        category: channelData.category || 'entertainment',
+        isCustom: true,
+        created_at: new Date().toISOString()
+    };
+    userCustomChannels.push(newChannel);
+    saveUserCustomChannelsLocal();
+    console.log('测试: 使用localStorage后备添加频道成功');
+    return newChannel;
+}
+
+function deleteUserCustomChannelLocal(channelId) {
+    const initialLength = userCustomChannels.length;
+    userCustomChannels = userCustomChannels.filter(channel => channel.id !== channelId);
+    const deleted = userCustomChannels.length < initialLength;
+    if (deleted) {
+        saveUserCustomChannelsLocal();
+        console.log('测试: 使用localStorage后备删除频道成功');
+    }
+    return deleted;
+}
+
+// 注意：addUserCustomChannel函数已移至文件上方并改为异步版本
+        category: channelData.category || 'entertainment',
+        protocol: determineProtocol(channelData.url),
+        isCustom: true,
+        addedAt: new Date().toISOString()
+    };
+    
+    console.log('测试: 频道信息创建完成:', newChannel.id);
+    // 添加到用户自定义频道列表
+    userCustomChannels.push(newChannel);
+    console.log('测试: 频道已添加到内存数组');
+    
+    // 保存到localStorage
+    saveUserCustomChannels();
+    
+    return newChannel;
+}
+
+// 删除用户自定义频道
+function deleteUserCustomChannel(channelId) {
+    console.log('测试: 开始删除自定义频道，ID:', channelId);
+    const index = userCustomChannels.findIndex(channel => channel.id === channelId);
+    if (index !== -1) {
+        console.log('测试: 找到频道，索引:', index);
+        userCustomChannels.splice(index, 1);
+        console.log('测试: 频道已从内存数组中移除');
+        saveUserCustomChannels();
+        return true;
+    }
+    console.log('测试: 未找到要删除的频道');
+    return false;
+}
+
+// 获取所有频道（包括内置和自定义）
+function getAllChannels() {
+    return [...channels, ...userCustomChannels];
+}
+
+// 确定URL的协议类型
+function determineProtocol(url) {
+    if (url.endsWith('.m3u8')) return 'hls';
+    if (url.endsWith('.mpd')) return 'dash';
+    if (url.endsWith('.bmp')) return 'bmp';
+    if (url.endsWith('.json')) return 'json';
+    // 默认认为是直接流
+    return 'direct';
 }
 
 // 频道数据
@@ -152,13 +361,6 @@ function loadDashJs() {
     });
 }
 
-// 初始化应用
-function initApp() {
-    renderChannels(channels);
-    setupEventListeners();
-    setupPlayerEvents();
-}
-
 // 切换频道收藏状态
 function toggleFavorite(channelId) {
     const channelIndex = favoriteChannels.indexOf(channelId);
@@ -215,13 +417,14 @@ function getRecentlyWatchedChannels() {
 
 // 更新频道显示
 function updateChannelDisplay() {
-    let filteredChannels = [...channels];
+    let allChannels = getAllChannels();
+    let filteredChannels = [...allChannels];
     
     // 应用分类筛选
     if (currentCategory === 'favorites') {
-        filteredChannels = channels.filter(channel => favoriteChannels.includes(channel.id));
+        filteredChannels = allChannels.filter(channel => favoriteChannels.includes(channel.id));
     } else if (currentCategory !== 'all') {
-        filteredChannels = channels.filter(channel => channel.category === currentCategory);
+        filteredChannels = allChannels.filter(channel => channel.category === currentCategory);
     }
     
     // 应用搜索筛选
@@ -297,12 +500,16 @@ function renderChannels(channelsList) {
         // 检查是否已收藏
         const isFavorite = favoriteChannels.includes(channel.id);
         
+        // 检查是否是自定义频道
+        const isCustom = channel.isCustom || false;
+        
         card.innerHTML = `
             <div class="channel-thumbnail">
                 <img src="${channel.thumbnail}" alt="${channel.name}">
                 <button class="favorite-btn ${isFavorite ? 'favorited' : ''}">
                     ${isFavorite ? '★' : '☆'}
                 </button>
+                ${isCustom ? '<span class="custom-badge">自定义</span>' : ''}
             </div>
             <div class="channel-details">
                 <div class="channel-name">${channel.name}</div>
@@ -310,6 +517,33 @@ function renderChannels(channelsList) {
                 <span class="channel-category">${getCategoryName(channel.category)}</span>
             </div>
         `;
+        
+        // 添加自定义频道类名
+        if (isCustom) {
+            card.classList.add('custom-channel');
+            
+            // 添加删除按钮
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-channel-btn';
+            deleteBtn.textContent = '删除';
+            deleteBtn.title = '删除自定义频道';
+            
+            // 添加删除频道的点击事件
+            deleteBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (confirm(`确定要删除频道"${channel.name}"吗？`)) {
+                    await deleteUserCustomChannel(channel.id);
+                    showNotification('频道已删除');
+                    updateChannelDisplay();
+                }
+            });
+            
+            // 将删除按钮添加到频道详情区域
+            const channelDetails = card.querySelector('.channel-details');
+            channelDetails.appendChild(deleteBtn);
+        }
         
         channelsContainer.appendChild(card);
     });
@@ -366,9 +600,12 @@ function getCategoryName(category) {
 }
 
 // 初始化应用
-function initApp() {
+async function initApp() {
     // 从本地存储加载收藏频道
     loadFavoriteChannels();
+    
+    // 从数据库加载自定义频道（异步）
+    await loadUserCustomChannels();
     
     // 创建导航栏和功能区
     createNavigationElements();
@@ -657,7 +894,9 @@ function setupEventListeners() {
         const channelCard = e.target.closest('.channel-card');
         if (channelCard) {
             const channelId = parseInt(channelCard.getAttribute('data-channel-id'));
-            const channel = channels.find(c => c.id === channelId);
+            // 从所有频道中查找，包括自定义频道
+            const allChannels = getAllChannels();
+            const channel = allChannels.find(c => c.id === channelId);
             if (channel) {
                 playChannel(channel);
                 // 记录最近观看
@@ -665,6 +904,69 @@ function setupEventListeners() {
             }
         }
     });
+    
+    // 添加频道按钮和模态窗口事件
+    const addChannelBtn = document.getElementById('add-channel-btn');
+    const addChannelModal = document.getElementById('add-channel-modal');
+    const closeModalBtn = document.getElementById('close-modal-btn');
+    const addChannelForm = document.getElementById('add-channel-form');
+    
+    if (addChannelBtn && addChannelModal) {
+        // 显示添加频道模态窗口
+        addChannelBtn.addEventListener('click', () => {
+            addChannelModal.style.display = 'block';
+        });
+        
+        // 关闭模态窗口
+        const closeModal = () => {
+            addChannelModal.style.display = 'none';
+            addChannelForm.reset();
+        };
+        
+        if (closeModalBtn) {
+            closeModalBtn.addEventListener('click', closeModal);
+        }
+        
+        // 点击模态窗口外部关闭
+        window.addEventListener('click', (e) => {
+            if (e.target === addChannelModal) {
+                closeModal();
+            }
+        });
+        
+        // 提交添加频道表单
+        if (addChannelForm) {
+            addChannelForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                
+                const name = document.getElementById('channel-name').value.trim();
+                const url = document.getElementById('channel-url').value.trim();
+                const description = document.getElementById('channel-description-input').value.trim();
+                const category = document.getElementById('channel-category').value;
+                
+                if (!name || !url) {
+                    alert('请填写频道名称和URL');
+                    return;
+                }
+                
+                // 添加新频道
+                const newChannel = await addUserCustomChannel({
+                    name,
+                    url,
+                    description,
+                    category
+                });
+                
+                if (newChannel) {
+                    showNotification('频道添加成功');
+                    closeModal();
+                    updateChannelDisplay();
+                } else {
+                    showNotification('频道添加失败');
+                }
+            });
+        }
+    }
     
     // 分类筛选事件
     filterButtons.forEach(button => {
@@ -890,6 +1192,12 @@ async function playChannel(channel) {
             await playHlsStream(channel.url);
         } else if (channel.protocol === 'dash' || channel.url.includes('.mpd')) {
             await playDashStream(channel.url);
+        } else if (channel.url.includes('.bmp')) {
+            // 处理BMP格式直播源
+            await playBmpStream(channel.url);
+        } else if (channel.url.includes('.json')) {
+            // 处理JSON格式直播源
+            await playJsonStream(channel.url);
         } else {
             // 尝试直接播放其他格式
             playDirectStream(channel.url);
@@ -927,6 +1235,143 @@ function stopCurrentPlayback() {
     player.src = '';
     player.load();
     isPlaying = false;
+}
+
+// 播放BMP格式直播源
+function playBmpStream(url) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            // 以ArrayBuffer格式获取BMP文件
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP错误! 状态: ${response.status}`);
+            }
+            
+            // 获取ArrayBuffer数据
+            const arrayBuffer = await response.arrayBuffer();
+            
+            // 创建Blob对象，指定MIME类型
+            const blob = new Blob([arrayBuffer], { type: 'video/mp4' }); // 使用通用视频MIME类型
+            
+            // 创建Blob URL
+            const videoUrl = URL.createObjectURL(blob);
+            
+            // 设置播放器源并播放
+            player.src = videoUrl;
+            
+            // 监听播放开始事件
+            player.oncanplay = () => {
+                player.play().then(() => {
+                    resolve();
+                }).catch(reject);
+                player.oncanplay = null;
+            };
+            
+            // 监听错误事件
+            player.onerror = (e) => {
+                URL.revokeObjectURL(videoUrl);
+                reject(new Error('BMP流播放失败'));
+                player.onerror = null;
+            };
+            
+            // 监听播放结束，释放URL
+            player.onended = () => {
+                URL.revokeObjectURL(videoUrl);
+                player.onended = null;
+            };
+        } catch (error) {
+            console.error('BMP播放错误:', error);
+            reject(new Error('BMP流加载或播放失败'));
+        }
+    });
+}
+
+// 播放JSON格式直播源
+function playJsonStream(url) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            // 获取JSON文件
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP错误! 状态: ${response.status}`);
+            }
+            
+            // 解析JSON数据
+            const jsonData = await response.json();
+            
+            // 尝试提取直播流URL的函数
+            const extractStreamUrl = (data) => {
+                // 常见直播URL字段
+                const urlFields = ['url', 'streamUrl', 'hlsUrl', 'dashUrl', 'videoUrl', 'source'];
+                
+                // 检查对象中的直接URL字段
+                for (const field of urlFields) {
+                    if (data[field] && typeof data[field] === 'string' && 
+                        (data[field].includes('.m3u8') || data[field].includes('.mpd') || 
+                         data[field].includes('.mp4') || data[field].includes('.webm'))) {
+                        return data[field];
+                    }
+                }
+                
+                // 检查streams数组
+                if (data.streams && Array.isArray(data.streams)) {
+                    for (const stream of data.streams) {
+                        const foundUrl = extractStreamUrl(stream);
+                        if (foundUrl) return foundUrl;
+                    }
+                }
+                
+                // 检查sources数组
+                if (data.sources && Array.isArray(data.sources)) {
+                    for (const source of data.sources) {
+                        const foundUrl = extractStreamUrl(source);
+                        if (foundUrl) return foundUrl;
+                    }
+                }
+                
+                // 检查media数组
+                if (data.media && Array.isArray(data.media)) {
+                    for (const media of data.media) {
+                        const foundUrl = extractStreamUrl(media);
+                        if (foundUrl) return foundUrl;
+                    }
+                }
+                
+                // 检查嵌套对象
+                for (const key in data) {
+                    if (typeof data[key] === 'object' && data[key] !== null) {
+                        const foundUrl = extractStreamUrl(data[key]);
+                        if (foundUrl) return foundUrl;
+                    }
+                }
+                
+                return null;
+            };
+            
+            // 提取直播流URL
+            const streamUrl = extractStreamUrl(jsonData);
+            
+            if (!streamUrl) {
+                throw new Error('JSON格式中未找到有效的直播流URL');
+            }
+            
+            console.log('从JSON中提取的直播流URL:', streamUrl);
+            
+            // 根据提取的URL格式选择相应的播放方法
+            if (streamUrl.includes('.m3u8')) {
+                await playHlsStream(streamUrl);
+            } else if (streamUrl.includes('.mpd')) {
+                await playDashStream(streamUrl);
+            } else {
+                playDirectStream(streamUrl);
+            }
+            
+            resolve();
+        } catch (error) {
+            console.error('JSON播放错误:', error);
+            reject(new Error(`JSON流加载或播放失败: ${error.message}`));
+        }
+    });
 }
 
 // 播放HLS流

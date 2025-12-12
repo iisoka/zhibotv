@@ -40,6 +40,7 @@
                     <button class="filter-btn" data-category="entertainment">娱乐</button>
                     <button class="filter-btn" data-category="sports">体育</button>
                     <button class="filter-btn" data-category="education">教育</button>
+                    <button class="add-channel-btn" id="add-channel-btn">添加频道</button>
                 </div>
             </div>
             <div class="channels-grid" id="channels-container">
@@ -51,6 +52,42 @@
     <footer>
         <p>&copy; 2024 电视直播. 所有权利保留.</p>
     </footer>
+
+    <!-- 添加频道模态窗口 -->
+    <div class="modal" id="add-channel-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>添加新频道</h3>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="add-channel-form">
+                    <div class="form-group">
+                        <label for="channel-name">频道名称</label>
+                        <input type="text" id="channel-name" required placeholder="请输入频道名称">
+                    </div>
+                    <div class="form-group">
+                        <label for="channel-url">直播源URL</label>
+                        <input type="url" id="channel-url" required placeholder="请输入直播源地址">
+                    </div>
+                    <div class="form-group">
+                        <label for="channel-description">频道描述</label>
+                        <textarea id="channel-description" placeholder="请输入频道描述"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="channel-category">频道分类</label>
+                        <select id="channel-category">
+                            <option value="entertainment">娱乐</option>
+                            <option value="news">新闻</option>
+                            <option value="sports">体育</option>
+                            <option value="education">教育</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="submit-btn">添加频道</button>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <script src="scripts.js"></script>
 </body>
