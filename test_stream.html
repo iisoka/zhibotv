@@ -104,7 +104,7 @@
         }
         
         // 简化的直接播放函数
-        function playDirectStream(url) {
+        async function playDirectStream(url) {
             return new Promise((resolve, reject) => {
                 player.src = url;
                 player.play()
@@ -124,8 +124,8 @@
         }
         
         // 导入playBmpStream函数（从scripts.js中复制的实现）
-        function playBmpStream(url) {
-            return new Promise(async (resolve, reject) => {
+        async function playBmpStream(url) {
+            return new Promise((resolve, reject) => {
                 try {
                     document.getElementById('result').textContent = `正在加载BMP文件: ${url}`;
                     console.log('正在加载BMP文件:', url);
@@ -165,8 +165,8 @@
         }
         
         // 导入playJsonStream函数（从scripts.js中复制的实现）
-        function playJsonStream(url) {
-            return new Promise(async (resolve, reject) => {
+        async function playJsonStream(url) {
+            return new Promise((resolve, reject) => {
                 try {
                     document.getElementById('result').textContent = `正在加载JSON文件: ${url}`;
                     console.log('正在加载JSON文件:', url);
