@@ -1,4 +1,33 @@
 // 模拟频道数据，包含多种协议的流媒体地址
+
+// 初始化全局变量
+let favoriteChannels = [];
+let currentCategory = 'all';
+let searchQuery = '';
+
+// 从本地存储加载收藏频道
+function loadFavoriteChannels() {
+    try {
+        const saved = localStorage.getItem('favoriteChannels');
+        if (saved) {
+            favoriteChannels = JSON.parse(saved);
+        }
+    } catch (error) {
+        console.error('加载收藏失败:', error);
+        favoriteChannels = [];
+    }
+}
+
+// 保存收藏频道到本地存储
+function saveFavoriteChannels() {
+    try {
+        localStorage.setItem('favoriteChannels', JSON.stringify(favoriteChannels));
+    } catch (error) {
+        console.error('保存收藏失败:', error);
+    }
+}
+
+// 频道数据
 const channels = [
     {
         id: 1,
@@ -1109,6 +1138,7 @@ function toggleFullscreen() {
 
 // 主函数，初始化应用
 function init() {
+    loadFavoriteChannels();
     initApp();
     
     // 默认播放第一个频道
